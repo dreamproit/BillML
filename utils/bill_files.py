@@ -1,10 +1,10 @@
 import os
 import re
 
+import aiofiles
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from lxml import etree
-
 
 NAMESPACES = {'uslm': 'https://xml.house.gov/schemas/uslm/1.0'}
 
@@ -125,9 +125,9 @@ def xml_to_text(xml_path: str, level: str = 'section', separator: str = '\n*****
     return separator.join([etree.tostring(section, method="text", encoding="unicode") for section in sections])
 
 
-def get_bill_sections(bill_filepath: str):
-    with open(bill_filepath) as xml:
-        soup = BeautifulSoup(xml, features="xml")
+async def get_bill_sections(bill_filepath: str):
+    async with aiofiles.open(bill_filepath, "r") as xml:
+        soup = BeautifulSoup(await xml.read(), features="xml")
     sections = soup.findAll('section')
     parsed = [parse_soup_section(sec) for sec in sections]
     return parsed

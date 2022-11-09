@@ -4,6 +4,7 @@ from datetime import datetime
 from glob import glob
 from pathlib import Path
 
+import aiofiles
 from bs4 import BeautifulSoup
 from lxml import etree
 
@@ -13,9 +14,9 @@ from utils.logging import setup_logging
 _log = setup_logging(os.path.basename(__file__))
 
 
-def check_bill_num_of_sections(num_sections: int, bill_filepath: str) -> bool:
-    with open(bill_filepath) as xml:
-        soup = BeautifulSoup(xml, features="xml")
+async def check_bill_num_of_sections(num_sections: int, bill_filepath: str) -> bool:
+    async with aiofiles.open(bill_filepath, "r") as xml:
+        soup = BeautifulSoup(await xml.read(), features="xml")
     sections = soup.findAll('section')
     if not sections:
         _log.debug('No sections')
@@ -37,17 +38,13 @@ def get_bills_folders_with_data_json_file(root_folder):
     return glob(f'{root_folder}/*/data.json', recursive=True)
 
 
-def get_bill_summary(data_json_path: str):
-    with open(data_json_path, 'r') as f:
-        bill_data_json = json.load(f)
-    return bill_data_json.get('summary')
-
-
-def get_bill_title(data_json_path: str):
-    with open(data_json_path, 'r') as f:
-        bill_data_json = json.load(f)
-        bill_titles = bill_data_json.get('titles')
-    return next(item for item in bill_titles if item['type'] == 'official')
+async def get_bill_data_json_info(data_json_path: str):
+    async with aiofiles.open(data_json_path, 'r') as f:
+        bill_data_json = json.loads(await f.read())
+    summary = bill_data_json.get('summary')
+    bill_titles = bill_data_json.get('titles')
+    official_title = next(item for item in bill_titles if item['type'] == 'official')
+    return {'summary': summary, 'title': official_title}
 
 
 def get_bills_folders_with_document_file(bill_folder: str):
@@ -80,17 +77,17 @@ def get_bill_id(bill_filepath: str):
     return f'{parts[-7]}_{parts[-4]}_{parts[-2]}'
 
 
-def get_bill_data(bill_folder: str, num_bill_sections: int):
+async def get_bill_data(bill_folder: str, num_bill_sections: int):
     document_folders = get_bills_folders_with_document_file(bill_folder)
     if not document_folders:
         return
     latest_document_filepath = get_latest_document_filepath(document_folders)
-    if not check_bill_num_of_sections(num_bill_sections, latest_document_filepath):
+    if not await check_bill_num_of_sections(num_bill_sections, latest_document_filepath):
         _log.debug(
             f'Bill with filepath: {latest_document_filepath} have more than: {num_bill_sections} sections.'
         )
         return
-    bill_sections = get_bill_sections(latest_document_filepath)
+    bill_sections = await get_bill_sections(latest_document_filepath)
     bill_text = ' '.join([section_text['text'] for section_text in bill_sections])
     result = {
         'id': get_bill_id(latest_document_filepath),
@@ -98,23 +95,27 @@ def get_bill_data(bill_folder: str, num_bill_sections: int):
         'text': bill_text,
         'text_len': len(bill_text),
     }
+    _log.debug(f'Got Bill data from bill file: {latest_document_filepath}')
     return result
 
 
-def process_bill_type_folder(bill_type_folder: str, num_bill_sections: int) -> list:
+async def process_bill_type_folder(bill_type_folder: str, num_bill_sections: int) -> list:
     _log.debug(f'PROCESSING Bill type folder: "{bill_type_folder}"')
     bill_type_result = []
     data_json_folders = get_bills_folders_with_data_json_file(bill_type_folder)
     for data_filepath in data_json_folders:
-        summary = get_bill_summary(data_filepath)
+        data_json = await get_bill_data_json_info(data_filepath)
+        summary = data_json.get('summary')
         if not summary:
             _log.debug(f'data.json with filepath: "{data_filepath}" have no summary.')
             continue
-        _log.debug(f'PROCESSING Bill summary from file: "{data_filepath}"')
-        title = get_bill_title(data_filepath)
+        title = data_json.get('title')
+        if not title:
+            _log.debug(f'data.json with filepath: "{data_filepath}" have no title.')
+            continue
+        _log.debug(f'Got Bill summary and title from file: "{data_filepath}"')
         bill_folder = Path(data_filepath).parent.absolute()
-        _log.debug(f'PROCESSING Bill data from folder: {bill_folder}')
-        bill_data = get_bill_data(bill_folder, num_bill_sections)
+        bill_data = await get_bill_data(bill_folder, num_bill_sections)
         if not bill_data:
             continue
         bill_data['summary'] = summary['text']
