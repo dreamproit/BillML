@@ -30,6 +30,10 @@ Set your own values to the ENV variables in the `.env` file
 |hconres,hjres,hr,hres,s,sconres,sjres,sres,
 |List bill types to process. (Must have "," at the end.)
 
+|`CONCURRENCY_LIMIT`
+|4000
+|Amount of the concurrent tasks required for dataset creation.(In case of `OSError` lower this number)
+
 |===
 
 ### 2 Setup python poetry

@@ -1,5 +1,6 @@
 import json
 import os
+from asyncio.locks import Semaphore
 from datetime import datetime
 from glob import glob
 from pathlib import Path
@@ -99,27 +100,23 @@ async def get_bill_data(bill_folder: str, num_bill_sections: int):
     return result
 
 
-async def process_bill_type_folder(bill_type_folder: str, num_bill_sections: int) -> list:
-    _log.debug(f'PROCESSING Bill type folder: "{bill_type_folder}"')
-    bill_type_result = []
-    data_json_folders = get_bills_folders_with_data_json_file(bill_type_folder)
-    for data_filepath in data_json_folders:
+async def process_bill_type_folder(data_filepath, num_bill_sections: int, concurrent_limit: Semaphore) -> list:
+    async with concurrent_limit:
         data_json = await get_bill_data_json_info(data_filepath)
         summary = data_json.get('summary')
         if not summary:
             _log.debug(f'data.json with filepath: "{data_filepath}" have no summary.')
-            continue
+            return
         title = data_json.get('title')
         if not title:
             _log.debug(f'data.json with filepath: "{data_filepath}" have no title.')
-            continue
+            return
         _log.debug(f'Got Bill summary and title from file: "{data_filepath}"')
         bill_folder = Path(data_filepath).parent.absolute()
         bill_data = await get_bill_data(bill_folder, num_bill_sections)
         if not bill_data:
-            continue
+            return
         bill_data['summary'] = summary['text']
         bill_data['summary_len'] = len(summary['text'])
         bill_data['title'] = title['title']
-        bill_type_result.append(bill_data)
-    return bill_type_result
+        return bill_data
