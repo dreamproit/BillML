@@ -1,0 +1,60 @@
+# BillML
+Collect bill text and metadata (summary) as datasets for machine learning
+
+## How to create dataset
+
+### 1 Setup `.env` file
+Use make command to create .env file
+```bash
+make env_setup
+```
+### 1.1 Configure `.env` file
+Set your own values to the ENV variables in the `.env` file
+
+|===
+
+|Variable name | Default value | Description
+|`TARGET_NUMBER_OF_BILL_SECTIONS`
+|10
+|Bills with no more then number of the bill sections will selected.
+
+|`BILLS_DATA_FOLDER`
+|/path/to/the/folder/congress.nosync/data
+|Path to folder where bill data stored.
+
+|`CONGRESSES_TO_PROCESS`
+|117,
+|List of US congresses numbers to process. (Must have "," at the end.)
+
+|`BILL_TYPES_TO_PROCESS`
+|hconres,hjres,hr,hres,s,sconres,sjres,sres,
+|List bill types to process. (Must have "," at the end.)
+
+|`CONCURRENCY_LIMIT`
+|4000
+|Amount of the concurrent tasks required for dataset creation.(In case of `OSError` lower this number)
+
+|===
+
+### 2 Setup python poetry
+Install https://python-poetry.org/docs/[poetry] and use command to install dependencies.
+```bash
+poetry install
+```
+
+### 2.1 Activate virtual env
+Use command to activate virtual env
+```bash
+poetry shell
+```
+
+### 3 Use create dataset script
+Do steps above and then use command to run python script that will create `.jsonl` file in the `output` folder.
+```bash
+python create_dataset.py
+```
+
+#### Links
+Example `.jsonl` dataset file stored here:
+
+https://drive.google.com/file/d/1agSam7D-L9F5kNra4VeGyt0e_l1F_xW8/view?usp=sharing[117 congress bills with no more then 10 sections]
