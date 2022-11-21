@@ -2,7 +2,11 @@
 name = "billml"
 version = "0.1.0"
 description = ""
-authors = ["Your Name <you@example.com>"]
+authors = [
+    "Andrii Kovalov <jfkwww1@gmail.com>",
+    "Alex Boiko <django.develop@gmail.com>",
+    "Ari Hershowitz <arihershowitz@dreamproit.com>",
+]
 readme = "README.md"
 
 [tool.poetry.dependencies]

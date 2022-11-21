@@ -22,7 +22,7 @@ async def check_bill_num_of_sections(num_sections: int, bill_filepath: str) -> b
     if not sections:
         _log.debug('No sections')
         return False
-    _log.debug(f'Bill with filepath: "{bill_filepath}" have: "{len(sections)}" section(s).')
+    _log.debug(f'Bill with filepath: "{bill_filepath}" has: "{len(sections)}" section(s).')
     return len(sections) <= num_sections
 
 
@@ -64,7 +64,7 @@ def get_latest_document_filepath(document_folders: list):
         try:
             bill_date = bill_tree.xpath('//dc:date/text()', namespaces=NAMESPACES)[0]
         except IndexError:
-            _log.debug(f'Bill with filepath: {document_filepath} have no date.')
+            _log.debug(f'Bill with filepath: {document_filepath} has no date.')
             bills_to_compare[document_filepath] = datetime.strptime('1900-01-01', '%Y-%m-%d')
             continue
         bills_to_compare[document_filepath] = datetime.strptime(bill_date, '%Y-%m-%d')
@@ -85,7 +85,7 @@ async def get_bill_data(bill_folder: str, num_bill_sections: int):
     latest_document_filepath = get_latest_document_filepath(document_folders)
     if not await check_bill_num_of_sections(num_bill_sections, latest_document_filepath):
         _log.debug(
-            f'Bill with filepath: {latest_document_filepath} have more than: {num_bill_sections} sections.'
+            f'Bill with filepath: {latest_document_filepath} has more than: {num_bill_sections} sections.'
         )
         return
     bill_sections = await get_bill_sections(latest_document_filepath)
@@ -105,11 +105,11 @@ async def process_bill_type_folder(data_filepath, num_bill_sections: int, concur
         data_json = await get_bill_data_json_info(data_filepath)
         summary = data_json.get('summary')
         if not summary:
-            _log.debug(f'data.json with filepath: "{data_filepath}" have no summary.')
+            _log.debug(f'data.json with filepath: "{data_filepath}" has no summary.')
             return
         title = data_json.get('title')
         if not title:
-            _log.debug(f'data.json with filepath: "{data_filepath}" have no title.')
+            _log.debug(f'data.json with filepath: "{data_filepath}" has no title.')
             return
         _log.debug(f'Got Bill summary and title from file: "{data_filepath}"')
         bill_folder = Path(data_filepath).parent.absolute()
