@@ -1,7 +1,7 @@
 # BillML
-Collect bill text and metadata (summary) as datasets for machine learning
+Collect bill text and metadata (summary) as datasets for machine learning. This repository presumes that bills are already collected, in XML format, in a local directory, specified in the local environment variable `BILLS_DATA_FOLDER`. 
 
-## How to create dataset
+## How to create dataset from a data directory
 
 ### 1 Setup `.env` file
 Use make command to create .env file
