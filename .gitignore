@@ -137,3 +137,7 @@ bills
 
 # jsonlines
 *.jsonl
+*.json
+output/saleforce_model_output/
+/query-focused-sum
+!samples/*.jsonl
