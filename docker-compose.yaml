@@ -1,0 +1,28 @@
+version: '3.9'
+
+volumes:
+  billml_logs:
+  bills_data:
+  datasets_data:
+
+services:
+
+### ================ BillML ==================
+
+  billml:
+    image: ${BILLML_IMAGE_NAME}:${BILLML_IMAGE_VERSION}
+    container_name: ${BILLML_DOCKER_COMPOSE_NAME}-${BILLML_CONTAINER_NAME}
+    restart: "no"
+    command: 
+      "/bin/sh -c /usr/src/app/entrypoint.sh"
+    env_file:
+      - .env
+    volumes:
+      - billml_logs:/usr/src/logs:rw
+      - bills_data:/bills_data:rw
+      - datasets_data:/datasets_data:rw
+    platform: ${BILLML_PLATFORM_NAME}
+    deploy:
+      resources:
+        limits:
+          memory: 8G

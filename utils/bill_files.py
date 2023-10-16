@@ -1,10 +1,17 @@
+import logging
 import os
+import pathlib
 import re
 
-import aiofiles
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 from lxml import etree
+import aiofiles
+import jsonlines
+
+from common.constants.billml import BillMLConstants
+
+logger = logging.getLogger(BillMLConstants.BILLML_DEFAULT_LOGGER_NAME.value)
 
 NAMESPACES = {'uslm': 'https://xml.house.gov/schemas/uslm/1.0'}
 
@@ -40,8 +47,7 @@ def parse_soup_section(section):
     raw_text = re.sub('\n+', '\n', raw_text).strip()
     section_id = section.attrs.get('id')
     nested = []
-    info = {'text': raw_text,
-            'id': section_id}
+    info = {'text': raw_text, 'id': section_id}
     for child in section.children:
         if not isinstance(child, Tag):
             continue
@@ -69,7 +75,9 @@ def get_all_file_paths(root_folder, ext):
     """
     filenames = list()
     for root_path, folders, files in os.walk(root_folder):
-        filenames += [os.path.join(root_path, f) for f in files if _get_file_ext(f) == ext]
+        filenames += [
+            os.path.join(root_path, f) for f in files if _get_file_ext(f) == ext
+        ]
         for folder in folders:
             filenames += get_all_file_paths(folder, ext)
     return filenames
@@ -90,12 +98,18 @@ def get_header(section) -> str:
 
 
 def sec_to_dict(section):
-    data = {'section_text': etree.tostring(section, method="text", encoding="unicode"),
-            'section_xml': etree.tostring(section, method="xml", encoding="unicode"),
-            'section_number': '',
-            'section_header': ''}
-    if (section.xpath('header') and len(section.xpath('header')) > 0
-            and section.xpath('enum') and len(section.xpath('enum')) > 0):
+    data = {
+        'section_text': etree.tostring(section, method="text", encoding="unicode"),
+        'section_xml': etree.tostring(section, method="xml", encoding="unicode"),
+        'section_number': '',
+        'section_header': '',
+    }
+    if (
+        section.xpath('header')
+        and len(section.xpath('header')) > 0
+        and section.xpath('enum')
+        and len(section.xpath('enum')) > 0
+    ):
         data['section_number'] = get_enum(section)
         data['section_header'] = get_header(section)
     return data
@@ -113,7 +127,9 @@ def xml_to_sections(xml_path: str):
     return [sec_to_dict(section) for section in sections]
 
 
-def xml_to_text(xml_path: str, level: str = 'section', separator: str = '\n*****\n') -> str:
+def xml_to_text(
+    xml_path: str, level: str = 'section', separator: str = '\n*****\n'
+) -> str:
     """
     Parses the xml file and returns the text of the body element, if any
     """
@@ -122,12 +138,53 @@ def xml_to_text(xml_path: str, level: str = 'section', separator: str = '\n*****
     if not sections:
         print('No sections found')
         return ''
-    return separator.join([etree.tostring(section, method="text", encoding="unicode") for section in sections])
+    return separator.join(
+        [
+            etree.tostring(section, method="text", encoding="unicode")
+            for section in sections
+        ]
+    )
 
 
-async def get_bill_sections(bill_filepath: str):
+async def get_bill_file_data(bill_filepath: str):
+    """Gets bill data from bill file."""
     async with aiofiles.open(bill_filepath, "r") as xml:
         soup = BeautifulSoup(await xml.read(), features="xml")
     sections = soup.findAll('section')
+    title_element = soup.find('official-title')
     parsed = [parse_soup_section(sec) for sec in sections]
-    return parsed
+    title = None
+    if title_element:
+        title = title_element.text
+    result = {
+        'sections': parsed,
+        'title': title,
+    }
+    return result
+
+
+def save_jsonl_file(data: list, output_filepath: str) -> None:
+    """Save data to jsonl file."""
+    pathlib.Path(output_filepath).parent.mkdir(parents=True, exist_ok=True)
+    with jsonlines.open(output_filepath, mode='a') as writer:
+        writer.write_all(data)
+
+
+def get_bill_id(bill_filepath: str):
+    """Gets bill_id in format '117hr123enr' from filepath."""
+    parts = bill_filepath.split('/')
+    return f'{parts[-7]}{parts[-4]}{parts[-2]}'
+
+
+# async def get_bill_title(bill_filepath: str) -> str:
+#     """Gets bill title from bill file."""
+#     bill_id = get_bill_id(bill_filepath)
+#     async with aiofiles.open(bill_filepath, "r") as xml:
+#         data = await xml.read()
+#     soup = BeautifulSoup(data, features='xml')
+#     title_element = soup.find('official-title')
+#     if title_element:
+#         bill_title = title_element.text
+#         return bill_title
+#     logger.info(f'Can not get bill title from: "{bill_id}".')
+#     return
