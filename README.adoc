@@ -215,10 +215,10 @@ The steps above described in the "Project setup" chapter of this readme.
 Use following command to create "bill_text_us" dataset. The dataset creation heavily rely on bills data presence. So if you setup project first time you have to make sure that you did previous steps correctly and bills data is present.
 
 ```bash
-docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/main.py --dataset_names='bill_summary_us'"
+docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/main.py --dataset_names='bill_text_us'"
 ```
 
-#### "bill_summary_us" CLI command parameters
+#### "bill_text_us" CLI command parameters
 
 |===
 
@@ -267,6 +267,35 @@ You can setup credentials to upload locally created datasets data to cloud stora
 
 ```bash
 docker exec billml_compose-billml bash -c ". utils/upload_datasets_data.sh"
+```
+
+## Setup scheduled running
+
+This chapter explains how to set up scheduled creating and uploading fresh datasets to hugging face repo. The following steps described as separate chapters in this readme.
+
+*Setup crontab schedulled steps to create datasets*
+
+After you setup ENV variables in .env file. You can use crontab -e command to edit crontab file and add backup script. Example of recommended schedule (At 23:11 on Sunday).
+
+```bash
+11 23 * * SUN docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/congress/core/run.py govinfo --bulkdata=BILLSTATUS; \
+poetry run python /usr/src/app/congress/core/run.py bills --collections=BILLS; \
+poetry run python /usr/src/app/congress/core/run.py govinfo --collections=BILLS --extract=xml,pdf; \
+poetry run python /usr/src/app/congress/core/tasks/check_local_files.py; \
+poetry run python /usr/src/app/main.py --dataset_names='bill_summary_us'; \
+poetry run python /usr/src/app/main.py --dataset_names='bill_text_us'; \
+. utils/upload_bills_data.sh; \
+. utils/upload_datasets_data.sh
+"
+```
+
+After schedulled run you can use command to upload datasets to hugging face:
+
+```bash
+# find name of created 'bill_summary_us' dataset
+ls /datasets_data/bill_summary_us
+# use utility script to upload dataset, for example:
+docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/utils/upload_dataset_to_hf.py --source_dataset_filepath=/datasets_data/bill_summary_us/bill_summary_us_11-10-2023_13-02-35.jsonl --hf_dataset_name=dreamproit/bill_summary_us --hf_path_in_repo=bill_summary_us.jsonl"
 ```
 
 ## Examples
