@@ -1,0 +1,3 @@
+[submodule "congress"]
+	path = congress
+	url = git@github.com:dreamproit/congress.git

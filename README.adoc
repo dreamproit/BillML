@@ -1,60 +1,303 @@
+:toc: auto
+
 # BillML
-Collect bill text and metadata (summary) as datasets for machine learning. This repository presumes that bills are already collected, in XML format, in a local directory, specified in the local environment variable `BILLS_DATA_FOLDER`. 
 
-## How to create dataset from a data directory
+## Introduction
 
-### 1 Setup `.env` file
-Use make command to create .env file
+This project creates datasets for machine learning from the US Congress bills. Currently supports creation of following datasets:
+
+- https://huggingface.co/datasets/dreamproit/bill_summary_us[bill_summary_us]
+- https://huggingface.co/datasets/dreamproit/bill_text_us[bill_text_us]
+
+## Build docker image with utility script
+
+To build docker image required for project to work you can use manual docker command or following command:
+
 ```bash
-make env_setup
+export DOCKER_IMAGE_TAGS=billml:1.0.0; . ./build_docker_image.sh
 ```
-### 1.1 Configure `.env` file
-Set your own values to the ENV variables in the `.env` file
+
+## Environment variables
+
+This chapter contains a table with explanation of the environment variables that used in the project's docker container.
 
 |===
 
 |Variable name | Default value | Description
-|`TARGET_NUMBER_OF_BILL_SECTIONS`
-|10
-|Bills with no more then number of the bill sections will selected.
 
-|`BILLS_DATA_FOLDER`
-|/path/to/the/folder/congress.nosync/data
-|Path to folder where bill data stored.
+|`BILLML_IMAGE_NAME`
+|dreamproit/billml
+|The name of `billml` image that will be used in `docker-compose.yaml`.
 
-|`CONGRESSES_TO_PROCESS`
-|117,
-|List of US congresses numbers to process. (Must have "," at the end.)
+|`BILLML_IMAGE_VERSION`
+|1.0.0
+|The version of `billml` image that will be used in `docker-compose.yaml`.
 
-|`BILL_TYPES_TO_PROCESS`
-|hconres,hjres,hr,hres,s,sconres,sjres,sres,
-|List bill types to process. (Must have "," at the end.)
+|`BILLML_CONTAINER_NAME`
+|billml
+|The name of the `billml` service container in docker-compose.
 
-|`CONCURRENCY_LIMIT`
+|`BILLML_PLATFORM_NAME`
+|linux/x86_64
+|The name of the platform that will be used in `billml` docker compose service.
+
+|`BILLML_RUN_FOR_EVER`
+|False
+|Variable used in `billml` 's `entrypoint.sh` to keep container running indefinitely (very handy in development).
+
+|`BILLML_LOCAL_VOLUME_PATH`
+|/path/to/repo/root
+|Variable used dev docker-compose to mount local volume to the container root.
+
+|`BILLML_LOG_OUTPUT_FOLDER`
+|/usr/src/logs
+|Path to folder where project will save .log files and .gz archives with logs archives.
+
+|`BILLML_LOCAL_FILESYSTEM_CONCURRENCY_LIMIT`
 |4000
 |Amount of the concurrent tasks required for dataset creation.(In case of `OSError` lower this number)
 
+|`BILLML_DATASETS_STORAGE_FILEPATH`
+|/datasets_data
+|Path to folder where project will save datasets.
+
+|`CONGRESS_DATA_FOLDER_FILEPATH`
+|/bills_data/data
+|Path to folder where https://github.com/dreamproit/congress[congress] project saves bills data.
+
+|`CONGRESS_CACHE_FOLDER_FILEPATH`
+|/bills_data/cache
+|Path to folder where https://github.com/dreamproit/congress[congress] project saves cache data.
+
+|`BILLML_BACKUP_BILLS_DATA_CLOUD_PROVIDER`
+|s3
+|The name of cloud provider to store bills data.
+
+|`BILLML_BACKUP_BILLS_DATA_BUCKET_NAME`
+|your-bucket-name
+|The name of AWS s3 bucket.
+
+|`BILLML_BACKUP_BILLS_DATA_ACCESS_KEY`
+|your-aws-access-key
+|The AWS access key for your s3 bucket.
+
+|`BILLML_BACKUP_BILLS_DATA_SECRET_KEY`
+|your-aws-secret-key
+|The AWS secret key for your s3 bucket.
+
+|`BILLML_BACKUP_DATASET_DATA_CLOUD_PROVIDER`
+|s3
+|The name of cloud provider to store datasets data.
+
+|`BILLML_BACKUP_DATASET_DATA_BUCKET_NAME`
+|your-bucket-name
+|The name of AWS s3 bucket.
+
+|`BILLML_BACKUP_DATASET_DATA_ACCESS_KEY`
+|your-aws-access-key
+|The AWS access key for your s3 bucket.
+
+|`BILLML_BACKUP_DATASET_DATA_SECRET_KEY`
+|your-aws-secret-key
+|The AWS secret key for your s3 bucket.
+
+|`BILLML_BACKUP_DATASET_HF_SECRET_KEY`
+|your-hugging-face-token
+|The hugging face https://huggingface.co/docs/hub/security-tokens[token] required for upload datasets to hugging face utility script to work.
+
 |===
 
-### 2 Setup python poetry
-Install https://python-poetry.org/docs/[poetry] and use command to install dependencies.
+## Project setup
+
+### Setup `.env` file
+
+Use make command to create .env file
 ```bash
-poetry install
+make env_setup
 ```
 
-### 2.1 Activate virtual env
-Use command to activate virtual env
+## Bills data setup
+
+### Run download BILLSTATUS .xml files CLI command
+
 ```bash
-poetry shell
+docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/congress/core/run.py govinfo --bulkdata=BILLSTATUS"
 ```
 
-### 3 Use create dataset script
-Do steps above and then use command to run python script that will create `.jsonl` file in the `output` folder.
+NOTE: You can add `--congress` parameter to download other congress(es) bills. The data will be stored in `CONGRESS_DATA_FOLDER_FILEPATH` folder.
+
+### Run convert `fdsys_billstatus.xml` files to `data.json` and `data.xml` files CLI command
+
 ```bash
-python create_dataset.py
+docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/congress/core/run.py bills --collections=BILLS"
 ```
 
-#### Links
-Example `.jsonl` dataset file stored here:
+NOTE: You can add `--congress` parameter to download other congress(es) bills.
 
-https://drive.google.com/file/d/1agSam7D-L9F5kNra4VeGyt0e_l1F_xW8/view?usp=sharing[117 congress bills with no more then 10 sections]
+### Run download bills `text-versions` CLI command
+
+```bash
+docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/congress/core/run.py govinfo --collections=BILLS --extract=xml,pdf"
+```
+
+NOTE: You can add `--congress` parameter to download other congress(es) bills as well as `--extract` parameter to extract other formats.
+
+### Run "check_local_files.py" utility script
+
+```bash
+docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/congress/core/tasks/check_local_files.py"
+```
+
+This script provides information about local filesystem:
+- How many BILL_STATUSES available in the https://api.govinfo.gov/docs/[API]
+- How many "fdsys_billstatus.xml" files present locally
+- How many "data.json" files(made out of "fdsys_billstatus.xml" files) present locally
+- How many bills available in the https://api.govinfo.gov/docs/[API]
+- How many bills .xml files present locally
+
+Also without skipping script steps the script will download all missing BILL_STATUS and bills data.(Very handy for updating local bills data)
+
+## How to create "bill_summary_us" dataset
+
+To create "bill_summary_us" dataset from scratch you need to do following steps with help of https://github.com/dreamproit/congress[congress] project:
+
+- Download BILLSTATUS .xml files(aka `fdsys_billstatus.xml` files)
+- Convert `fdsys_billstatus.xml` files to `data.json` and `data.xml` files
+- Download bills `text-versions`
+- Run CLI commands to create "bill_summary_us" dataset
+
+The steps above described in the "Project setup" chapter of this readme.
+
+### Run "bill_summary_us" dataset creation CLI command
+
+Use following command to create "bill_summary_us" dataset. The dataset creation heavily rely on bills data presence. So if you setup project first time you have to make sure that you did previous steps correctly and bills data is present.
+
+```bash
+docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/main.py --dataset_names='bill_summary_us'"
+```
+
+#### "bill_summary_us" CLI command parameters
+
+|===
+
+|Parameter name | Default value | Description
+
+|`--dataset_names`
+|None
+|The name dataset user wants to create.
+
+|`--sections_limit`
+|None
+|The number of sections that bill should have to be included in the dataset.
+We will include all bills with number of sections more or equal sections_limit.
+
+|`--congresses_to_include`
+|None
+|Number of congresses user want to include in the dataset. If no value provided all congresses available in the filesystem will be included.
+
+|`--bill_types_to_include`
+|['hconres', 'hjres', 'hr', 'hres', 's', 'sconres', 'sjres', 'sres',]
+|Bill types user want to include in the dataset(s) if no value provided all bill types will be included.
+
+|===
+
+## How to create "bill_text_us" dataset
+
+To create "bill_text_us" dataset from scratch you need to do following steps with help of https://github.com/dreamproit/congress[congress] project:
+
+- Download bills `text-versions`
+- Run CLI commands to create "bill_text_us" dataset
+
+The steps above described in the "Project setup" chapter of this readme.
+
+### Run "bill_text_us" dataset creation CLI command
+
+Use following command to create "bill_text_us" dataset. The dataset creation heavily rely on bills data presence. So if you setup project first time you have to make sure that you did previous steps correctly and bills data is present.
+
+```bash
+docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/main.py --dataset_names='bill_text_us'"
+```
+
+#### "bill_text_us" CLI command parameters
+
+|===
+
+|Parameter name | Default value | Description
+
+|`--dataset_names`
+|None
+|The name dataset user wants to create.
+
+|`--sections_limit`
+|None
+|The number of sections that bill should have to be included in the dataset.
+We will include all bills with number of sections more or equal sections_limit.
+
+|`--congresses_to_include`
+|None
+|Number of congresses user want to include in the dataset. If no value provided all congresses available in the filesystem will be included.
+
+|`--bill_types_to_include`
+|['hconres', 'hjres', 'hr', 'hres', 's', 'sconres', 'sjres', 'sres',]
+|Bill types user want to include in the dataset(s) if no value provided all bill types will be included.
+
+|===
+
+## Upload bill data to cloud storage
+
+You can setup credentials to upload locally downloaded bills data to cloud storage (AWS s3 currently supported). To do that use following command:
+
+```bash
+docker exec billml_compose-billml bash -c ". utils/upload_bills_data.sh"
+```
+
+## Download bill data from cloud storage
+
+You can setup credentials to download(previously downloaded via project) bills data from cloud storage (AWS s3 currently supported). To do that use following command:
+
+```bash
+docker exec billml_compose-billml bash -c ". utils/download_bills_data.sh"
+```
+
+NOTE: You must setup ENV variables with your s3 bucket name and keys.
+
+## Upload datasets data to cloud storage
+
+You can setup credentials to upload locally created datasets data to cloud storage (AWS s3 currently supported). To do that use following command:
+
+```bash
+docker exec billml_compose-billml bash -c ". utils/upload_datasets_data.sh"
+```
+
+## Setup scheduled running
+
+This chapter explains how to set up scheduled creating and uploading fresh datasets to hugging face repo. The following steps described as separate chapters in this readme.
+
+*Setup crontab schedulled steps to create datasets*
+
+After you setup ENV variables in .env file. You can use crontab -e command to edit crontab file and add backup script. Example of recommended schedule (At 23:11 on Sunday).
+
+```bash
+11 23 * * SUN docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/congress/core/run.py govinfo --bulkdata=BILLSTATUS; \
+poetry run python /usr/src/app/congress/core/run.py bills --collections=BILLS; \
+poetry run python /usr/src/app/congress/core/run.py govinfo --collections=BILLS --extract=xml,pdf; \
+poetry run python /usr/src/app/congress/core/tasks/check_local_files.py; \
+poetry run python /usr/src/app/main.py --dataset_names='bill_summary_us'; \
+poetry run python /usr/src/app/main.py --dataset_names='bill_text_us'; \
+. utils/upload_bills_data.sh; \
+. utils/upload_datasets_data.sh
+"
+```
+
+After schedulled run you can use command to upload datasets to hugging face:
+
+```bash
+# find name of created 'bill_summary_us' dataset
+ls /datasets_data/bill_summary_us
+# use utility script to upload dataset, for example:
+docker exec billml_compose-billml bash -c "poetry run python /usr/src/app/utils/upload_dataset_to_hf.py --source_dataset_filepath=/datasets_data/bill_summary_us/bill_summary_us_11-10-2023_13-02-35.jsonl --hf_dataset_name=dreamproit/bill_summary_us --hf_path_in_repo=bill_summary_us.jsonl"
+```
+
+## Examples
+
+Example `.jsonl` dataset files stored in repo `samples` folder. Each example dataset file have 10 items.

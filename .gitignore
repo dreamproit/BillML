@@ -141,3 +141,6 @@ bills
 output/saleforce_model_output/
 /query-focused-sum
 !samples/*.jsonl
+
+# misc
+*.whl

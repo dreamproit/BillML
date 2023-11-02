@@ -1,0 +1,9 @@
+version: '3.9'
+# Development version of the docker-compose must be used ONLY for dev purposes.
+services:
+
+### ================ bill-process ==================
+
+  billml:
+    volumes:
+      - ${BILLML_LOCAL_VOLUME_PATH}:/usr/src/app
