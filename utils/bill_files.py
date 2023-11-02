@@ -153,9 +153,7 @@ async def get_bill_file_data(bill_filepath: str):
     sections = soup.findAll('section')
     title_element = soup.find('official-title')
     parsed = [parse_soup_section(sec) for sec in sections]
-    title = None
-    if title_element:
-        title = title_element.text
+    title = title_element.text if title_element else None
     result = {
         'sections': parsed,
         'title': title,
@@ -174,17 +172,3 @@ def get_bill_id(bill_filepath: str):
     """Gets bill_id in format '117hr123enr' from filepath."""
     parts = bill_filepath.split('/')
     return f'{parts[-7]}{parts[-4]}{parts[-2]}'
-
-
-# async def get_bill_title(bill_filepath: str) -> str:
-#     """Gets bill title from bill file."""
-#     bill_id = get_bill_id(bill_filepath)
-#     async with aiofiles.open(bill_filepath, "r") as xml:
-#         data = await xml.read()
-#     soup = BeautifulSoup(data, features='xml')
-#     title_element = soup.find('official-title')
-#     if title_element:
-#         bill_title = title_element.text
-#         return bill_title
-#     logger.info(f'Can not get bill title from: "{bill_id}".')
-#     return
